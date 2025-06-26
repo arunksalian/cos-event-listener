@@ -16,6 +16,9 @@ A Python Flask application that accepts HTTP GET requests with query parameters 
 - **Event verification tools**
 - **PDF file detection and tracking**
 - **PDF upload statistics and monitoring**
+- **Enhanced logging with multiple levels and rotation**
+- **Performance monitoring and metrics**
+- **Detailed error tracking and debugging**
 - Configurable port via environment variable
 - Docker support for easy deployment
 
@@ -389,6 +392,8 @@ Response:
 - `COS_REGION`: Your COS region (default: us-south)
 - `APP_URL`: Your application URL for webhook configuration
 - `LOG_LEVEL`: Logging level (default: INFO)
+- `LOG_FILE`: Log file path (default: app.log)
+- `DISABLE_SIGNATURE_VERIFICATION`: Disable signature verification for testing (default: false)
 
 Example:
 ```bash
@@ -396,6 +401,8 @@ export COS_ENDPOINT="https://s3.us-south.cloud-object-storage.appdomain.cloud"
 export COS_BUCKET_NAME="my-bucket"
 export COS_SECRET_KEY="my-webhook-secret"
 export APP_URL="https://cos-event-listener.xyz.us-south.codeengine.appdomain.cloud"
+export LOG_LEVEL="DEBUG"
+export LOG_FILE="app.log"
 ```
 
 ## COS Event Types
@@ -446,6 +453,102 @@ The PDF detection system is designed for easy extension:
 - Send notifications
 - Update databases
 
+## Enhanced Logging System
+
+The application includes a comprehensive logging system with multiple features:
+
+### Logging Features
+- **Multiple Log Levels**: DEBUG, INFO, WARNING, ERROR, CRITICAL
+- **Dual Output**: Console and file logging
+- **Log Rotation**: Automatic log file rotation with size limits
+- **Separate Error Logs**: Dedicated error log files
+- **Structured Format**: Detailed timestamps and context information
+- **Performance Tracking**: Request timing and performance metrics
+- **Request/Response Logging**: Complete HTTP request/response details
+
+### Log Configuration
+```bash
+# Set log level
+export LOG_LEVEL="DEBUG"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+
+# Set log file path
+export LOG_FILE="app.log"
+
+# Default configuration
+LOG_LEVEL=INFO
+LOG_FILE=app.log
+MAX_LOG_SIZE=10MB
+BACKUP_COUNT=5
+```
+
+### Log Output Examples
+
+#### Application Startup
+```
+2024-01-15 10:30:00 - __main__ - INFO - 🚀 Starting Cloud Object Storage Event Listener
+2024-01-15 10:30:00 - __main__ - INFO - 📋 Application Configuration:
+2024-01-15 10:30:00 - __main__ - INFO -    - COS Endpoint: Configured
+2024-01-15 10:30:00 - __main__ - INFO -    - COS Bucket: Configured
+2024-01-15 10:30:00 - __main__ - INFO - 📊 PDF Detection System Initialized
+```
+
+#### COS Event Processing
+```
+2024-01-15 10:30:05 - __main__ - INFO - 📨 COS Event received from IP: 192.168.1.100
+2024-01-15 10:30:05 - __main__ - INFO - 🔐 Attempting signature verification...
+2024-01-15 10:30:05 - __main__ - INFO - ✅ Signature verification successful
+2024-01-15 10:30:05 - __main__ - INFO - 🔄 Processing COS events...
+2024-01-15 10:30:05 - __main__ - INFO - 📋 Processing IBM COS format with 1 events
+2024-01-15 10:30:05 - __main__ - INFO - ✅ Successfully processed 1 events
+2024-01-15 10:30:05 - __main__ - INFO -    Event 1: Object:Put - documents/report.pdf
+```
+
+#### PDF Detection
+```
+2024-01-15 10:30:05 - __main__ - INFO - 📄 PDF UPLOAD DETECTED: File 'documents/report.pdf' uploaded to bucket 'my-bucket' at 2024-01-15T10:30:05.000Z
+2024-01-15 10:30:05 - __main__ - INFO - 📄 PDF Details: Event Type: Object:Put, Source: ibm_cos
+2024-01-15 10:30:05 - __main__ - INFO - 📊 PDF Upload Statistics Updated: Total count = 1, Recent uploads = 1
+```
+
+#### Performance Metrics
+```
+2024-01-15 10:30:05 - __main__ - INFO - ⏱️ Performance: COS event processing completed in 0.045 seconds
+2024-01-15 10:30:05 - __main__ - INFO - 📤 Sending response with 1 processed events
+```
+
+### Log Files
+- `app.log`: Main application log with all levels
+- `app_error.log`: Error-only log file
+- Console output: Real-time logging to terminal
+
+### Debugging with Logs
+The enhanced logging system provides comprehensive debugging information:
+
+1. **Request Tracking**: Every HTTP request is logged with details
+2. **Event Processing**: Step-by-step COS event processing logs
+3. **PDF Detection**: Detailed PDF file detection and tracking
+4. **Performance**: Timing information for all operations
+5. **Error Context**: Full exception details with stack traces
+6. **Configuration**: Application startup and configuration logs
+
+### Log Analysis
+```bash
+# View recent logs
+tail -f app.log
+
+# Search for PDF uploads
+grep "PDF UPLOAD DETECTED" app.log
+
+# Search for errors
+grep "ERROR" app_error.log
+
+# Monitor performance
+grep "Performance:" app.log
+
+# Track specific events
+grep "Object:Put" app.log
+```
+
 ## Event Processing
 
 When a COS event is received:
@@ -455,6 +558,78 @@ When a COS event is received:
 3. **Event Extraction**: Relevant information is extracted (bucket, object key, event type)
 4. **Logging**: All events are logged for monitoring
 5. **Response**: A success response is returned to COS
+
+### Supported Event Formats
+
+The application supports multiple COS event formats:
+
+#### 1. IBM COS Format (Standard)
+```json
+{
+  "events": [
+    {
+      "eventType": "Object:Put",
+      "bucket": "my-bucket",
+      "key": "uploads/document.pdf",
+      "time": "2024-01-15T10:30:00.000Z"
+    }
+  ]
+}
+```
+
+#### 2. S3-Compatible Format
+```json
+{
+  "Records": [
+    {
+      "eventName": "s3:ObjectCreated:Put",
+      "eventTime": "2024-01-15T10:30:00.000Z",
+      "s3": {
+        "bucket": {
+          "name": "my-bucket"
+        },
+        "object": {
+          "key": "uploads/document.pdf"
+        }
+      }
+    }
+  ]
+}
+```
+
+#### 3. Direct COS Notification Format
+```json
+{
+  "bucket": "my-bucket",
+  "endpoint": "https://s3.us-south.cloud-object-storage.appdomain.cloud",
+  "key": "uploads/document.pdf",
+  "notification": "Object:Put",
+  "operation": "Put"
+}
+```
+
+#### 4. Real COS Event Format (Enhanced)
+```json
+{
+  "bucket": "bucket-redact-test",
+  "endpoint": "https://s3.us-south.cloud-object-storage.appdomain.cloud",
+  "key": "MyTheron - Architecture.pdf",
+  "notification": "Object:Write",
+  "operation": "Write",
+  "event_type": "Object:Write",
+  "object_name": "MyTheron - Architecture.pdf",
+  "content_type": "application/pdf",
+  "object_length": "387865",
+  "object_etag": "e7a674fd5d11958e378721dca5dafbfc",
+  "request_id": "1e367faf-700c-4cc0-99ec-eb30d109d9fe",
+  "request_time": "2025-06-26T07:07:13.192Z",
+  "format": "2.0"
+}
+```
+
+**Note**: The application now supports multiple field name variations:
+- Object key: `key` or `object_name`
+- Event type: `event_type`, `notification`, or `operation`
 
 ### Sample Event Response
 ```json
@@ -566,6 +741,30 @@ This test script will:
 - ✅ Verify PDF detection and logging
 - ✅ Check updated statistics
 
+### Direct COS Format Testing
+```bash
+# Test direct COS notification format
+python test_direct_cos_format.py
+```
+
+This test script will:
+- ✅ Test direct COS notification format handling
+- ✅ Verify mixed event format support
+- ✅ Test PDF detection with direct COS format
+- ✅ Validate event extraction for different configurations
+
+### Real COS Format Testing
+```bash
+# Test real COS event format (from actual logs)
+python test_real_cos_format.py
+```
+
+This test script will:
+- ✅ Test real COS event format based on actual production logs
+- ✅ Verify PDF detection with Object:Write events
+- ✅ Test multiple field name variations (key, object_name, event_type, notification)
+- ✅ Validate robust event extraction for different COS configurations
+
 ### Event Verification Testing
 ```bash
 # Run comprehensive tests
@@ -601,6 +800,45 @@ python view_events.py
    - Verify COS notification is properly configured
    - Check if your app is accessible from the internet
    - Review IBM Cloud logs for delivery status
+
+5. **Events showing as "Unknown" in logs**:
+   - This indicates the event format is not recognized
+   - Check the event structure in logs: `data structure: ['bucket', 'endpoint', 'key', 'notification', 'operation']`
+   - The application now supports direct COS notification format
+   - Run `python test_direct_cos_format.py` to verify format handling
+
+6. **PDF detection not working**:
+   - Verify the event is an upload event (Object:Put, Object:Post, etc.)
+   - Check if the file has a .pdf extension or contains "pdf" in the filename
+   - Review logs for PDF detection messages
+   - Test with `python test_pdf_detection.py`
+
+### Event Format Troubleshooting
+
+If you see logs like:
+```
+📋 Processing single event or unknown format
+✅ Event processing completed - 1 events processed
+   Event 1: Unknown - Unknown
+```
+
+This means the event format is not being recognized. The application now supports:
+
+1. **IBM COS Format**: `{"events": [...]}`
+2. **S3-Compatible Format**: `{"Records": [...]}`
+3. **Direct COS Format**: `{"bucket": "...", "key": "...", "notification": "...", "operation": "..."}`
+
+To debug event format issues:
+```bash
+# Check the event structure in logs
+grep "data structure:" app.log
+
+# Test with different formats
+python test_direct_cos_format.py
+
+# Enable debug logging
+export LOG_LEVEL="DEBUG"
+```
 
 ### Logs
 The application logs all COS events and errors. Check the logs for:
